@@ -3,6 +3,8 @@ const app = express()
 const cors = require('cors');
 require('dotenv').config();
 const { MongoClient } = require('mongodb');
+const ObjectId = require('mongodb').ObjectId;
+const fileUpload = require('express-fileupload');
 const admin = require("firebase-admin");
 
 const port = process.env.PORT || 5000;
@@ -16,6 +18,7 @@ admin.initializeApp({
 
 app.use(cors());
 app.use(express.json())
+app.use(fileUpload());
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.hrpwo.mongodb.net/myFirstDatabase?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
@@ -42,7 +45,9 @@ async function run() {
         await client.connect();
         const database = client.db('doctors')
         const appointmentsCollections = database.collection('appointments')
+
         const usersCollections = database.collection('users')
+        const doctorsCollections = database.collection('doctors');
         //  post user appointments
         app.post('/appointments', async (req, res) => {
             const appointment = req.body;
@@ -59,7 +64,39 @@ async function run() {
             const appointments = await cursor.toArray();
             res.json(appointments);
         })
+        app.get('/appointments/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) };
+            const result = await appointmentsCollections.findOne(query);
+            res.json(result);
+        })
 
+        // doctors 
+        app.post('/doctors', async (req, res) => {
+            const name = req.body.name;
+            const email = req.body.email;
+            const pic = req.files.image;
+            const picData = pic.data;
+            const encodedPic = picData.toString('base64');
+            const imageBuffer = Buffer.from(encodedPic, 'base64');
+            const doctor = {
+                name,
+                email,
+                image: imageBuffer
+            }
+            const result = await doctorsCollections.insertOne(doctor);
+            res.json(result);
+        })
+        app.get('/doctors', async (req, res) => {
+            const cursor = doctorsCollections.find({});
+            const doctors = await cursor.toArray();
+            res.json(doctors);
+        });
+        app.get('/doctors/:id', async (req, res) => {
+            const query = { _id: ObjectId(req.params.id) }
+            const doctor = await doctorsCollection.findOne(query);
+            res.json(doctor);
+        });
         // post user 
         app.post('/users', async (req, res) => {
             const user = req.body;
